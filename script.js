@@ -5,7 +5,8 @@ const BALLZ = [];
 const WALLZ = [];
 
 let LEFT, UP, RIGHT, DOWN;
-let friction = 0.05;
+let friction = 0.025;
+let selectedBallIndex = null;
 
 class Vector{
     constructor(x, y){
@@ -56,7 +57,7 @@ class Vector{
 }
 
 class Ball{
-    constructor(x, y, r, m){
+    constructor(x, y, r, m, color = "red"){
         this.pos = new Vector(x,y);
         this.r = r;
         this.m = m;
@@ -68,8 +69,9 @@ class Ball{
         this.elasticity = 1;
         this.vel = new Vector(0,0);
         this.acc = new Vector(0,0);
-        this.acceleration = 1;
+        this.acceleration = 0.3;
         this.player = false;
+        this.color = color;
         BALLZ.push(this);
     }
 
@@ -78,8 +80,17 @@ class Ball{
         ctx.arc(this.pos.x, this.pos.y, this.r, 0, 2*Math.PI);
         ctx.strokeStyle = "black";
         ctx.stroke();
-        ctx.fillStyle = "red";
+        ctx.fillStyle = this.color;
         ctx.fill();
+        if (selectedBallIndex !== null && BALLZ[selectedBallIndex] === this) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#00f";
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, this.r+3, 0, 2*Math.PI);
+            ctx.stroke();
+            ctx.closePath();
+            ctx.lineWidth = 1;
+        }
         ctx.closePath();
     }
 
@@ -97,8 +108,6 @@ class Ball{
         this.pos = this.pos.add(this.vel);
     }
 }
-
-//Walls are line segments between two points
 class Wall{
     constructor(x1, y1, x2, y2){
         this.start = new Vector(x1, y1);
@@ -179,8 +188,6 @@ function round(number, precision){
 function randInt(min, max){
     return Math.floor(Math.random() * (max-min+1)) + min;
 }
-
-//returns with the closest point on a line segment to a given point
 function closestPointBW(b1, w1){
     let ballToWallStart = w1.start.subtr(b1.pos);
     if(Vector.dot(w1.wallUnit(), ballToWallStart) > 0){
@@ -204,8 +211,6 @@ function coll_det_bb(b1, b2){
         return false;
     }
 }
-
-//collision detection between ball and wall
 function coll_det_bw(b1, w1){
     let ballToClosest = closestPointBW(b1, w1).subtr(b1.pos);
     if (ballToClosest.mag() <= b1.r){
@@ -220,8 +225,6 @@ function pen_res_bb(b1, b2){
     b1.pos = b1.pos.add(pen_res.mult(b1.inv_m));
     b2.pos = b2.pos.add(pen_res.mult(-b2.inv_m));
 }
-
-//penetration resolution between ball and wall
 function pen_res_bw(b1, w1){
     let penVect = b1.pos.subtr(closestPointBW(b1, w1));
     b1.pos = b1.pos.add(penVect.unit().mult(b1.r-penVect.mag()));
@@ -240,8 +243,6 @@ function coll_res_bb(b1, b2){
     b1.vel = b1.vel.add(impulseVec.mult(b1.inv_m));
     b2.vel = b2.vel.add(impulseVec.mult(-b2.inv_m));
 }
-
-//collision response between ball and wall
 function coll_res_bw(b1, w1){
     let normal = b1.pos.subtr(closestPointBW(b1, w1)).unit();
     let sepVel = Vector.dot(b1.vel, normal);
@@ -262,7 +263,6 @@ function mainLoop(timestamp) {
         if (b.player){
             keyControl(b);
         }
-        //each ball object iterates through each wall object
         WALLZ.forEach((w) => {
             if(coll_det_bw(BALLZ[index], w)){
                 pen_res_bw(BALLZ[index], w);
@@ -279,7 +279,6 @@ function mainLoop(timestamp) {
         b.reposition();
     });
 
-    //drawing each wall on the canvas
     WALLZ.forEach((w) => {
         w.drawWall();
     })
@@ -287,29 +286,125 @@ function mainLoop(timestamp) {
     requestAnimationFrame(mainLoop);
 }
 
+function addBallFromForm(){
+    const x = Number(document.getElementById('add_b_x').value) || 100;
+    const y = Number(document.getElementById('add_b_y').value) || 100;
+    const r = Number(document.getElementById('add_b_r').value) || 20;
+    const m = Number(document.getElementById('add_b_m').value) || 1;
+    const e = Number(document.getElementById('add_b_e').value);
+    const col = document.getElementById('add_b_col').value || 'red';
+    const b = new Ball(x,y,r,m,col);
+    if(!isNaN(e)) b.elasticity = e;
+    refreshBallList();
+}
+
+function addWallFromForm(){
+    const x1 = Number(document.getElementById('add_w_x1').value) || 0;
+    const y1 = Number(document.getElementById('add_w_y1').value) || 0;
+    const x2 = Number(document.getElementById('add_w_x2').value) || 0;
+    const y2 = Number(document.getElementById('add_w_y2').value) || 0;
+    new Wall(x1,y1,x2,y2);
+}
+
+function refreshBallList(){
+    const sel = document.getElementById('ballList');
+    sel.innerHTML = '';
+    BALLZ.forEach((b, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.text = `#${i} (r:${b.r} m:${b.m})`;
+        sel.appendChild(opt);
+    });
+    if(selectedBallIndex !== null && BALLZ[selectedBallIndex]){
+        sel.value = selectedBallIndex;
+    } else {
+        selectedBallIndex = null;
+        clearBallProps();
+    }
+}
+
+function clearBallProps(){
+    document.getElementById('prop_b_x').value = '';
+    document.getElementById('prop_b_y').value = '';
+    document.getElementById('prop_b_r').value = '';
+    document.getElementById('prop_b_m').value = '';
+    document.getElementById('prop_b_e').value = '';
+    document.getElementById('prop_b_col').value = '';
+}
+
+function selectBall(index){
+    if(index == null || !BALLZ[index]) {
+        selectedBallIndex = null;
+        clearBallProps();
+        return;
+    }
+    selectedBallIndex = Number(index);
+    const b = BALLZ[selectedBallIndex];
+    document.getElementById('prop_b_x').value = round(b.pos.x,2);
+    document.getElementById('prop_b_y').value = round(b.pos.y,2);
+    document.getElementById('prop_b_r').value = b.r;
+    document.getElementById('prop_b_m').value = b.m;
+    document.getElementById('prop_b_e').value = b.elasticity;
+    document.getElementById('prop_b_col').value = b.color;
+}
+
+function updateSelectedBall(){
+    if(selectedBallIndex == null || !BALLZ[selectedBallIndex]) return;
+    const b = BALLZ[selectedBallIndex];
+    b.pos.x = Number(document.getElementById('prop_b_x').value) || b.pos.x;
+    b.pos.y = Number(document.getElementById('prop_b_y').value) || b.pos.y;
+    b.r = Number(document.getElementById('prop_b_r').value) || b.r;
+    b.m = Number(document.getElementById('prop_b_m').value) || b.m;
+    b.inv_m = b.m === 0 ? 0 : 1 / b.m;
+    const e = Number(document.getElementById('prop_b_e').value);
+    if(!isNaN(e)) b.elasticity = e;
+    b.color = document.getElementById('prop_b_col').value || b.color;
+    refreshBallList();
+}
+
+function deleteSelectedBall(){
+    if(selectedBallIndex == null || !BALLZ[selectedBallIndex]) return;
+    BALLZ.splice(selectedBallIndex, 1);
+    selectedBallIndex = null;
+    refreshBallList();
+}
+
+document.getElementById('addBallBtn').addEventListener('click', addBallFromForm);
+document.getElementById('addWallBtn').addEventListener('click', addWallFromForm);
+document.getElementById('ballList').addEventListener('change', (e) => {
+    selectBall(e.target.value);
+});
+document.getElementById('updateBallBtn').addEventListener('click', updateSelectedBall);
+document.getElementById('deleteBallBtn').addEventListener('click', deleteSelectedBall);
+
+canvas.addEventListener('click', (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    const my = ev.clientY - rect.top;
+    let found = null;
+    for(let i = 0; i < BALLZ.length; i++){
+        const b = BALLZ[i];
+        const d = b.pos.subtr(new Vector(mx,my)).mag();
+        if(d <= b.r + 4){
+            found = i;
+            break;
+        }
+    }
+    selectBall(found);
+    refreshBallList();
+});
+
 for (let i = 0; i < 10; i++){
     let newBall = new Ball(randInt(100,500), randInt(50,400), randInt(20,50), randInt(0,10));
     newBall.elasticity = randInt(0,10) / 10;
 }
 let Wall2 = new Wall(300, 400, 550, 200);
-
-//walls along the canvas edges
 let edge1 = new Wall(0, 0, canvas.clientWidth, 0);
 let edge2 = new Wall(canvas.clientWidth, 0, canvas.clientWidth, canvas.clientHeight);
 let edge3 = new Wall(canvas.clientWidth, canvas.clientHeight, 0, canvas.clientHeight);
 let edge4 = new Wall(0, canvas.clientHeight, 0, 0);
 BALLZ[0].player = true;
 
-//intro if canvas 1138x640
-// let Wall1 = new Wall(1000, 350, 1100, 500);
-// let Wall2 = new Wall(700, 50, 800, 50);
-// let Ball1 = new Ball(-4000, 400, 80, 10);
-// let Ball2 = new Ball(960, 585, 35, 2);
-// let Ball3 = new Ball(1005, 610, 10, 2);
-// let Ball4 = new Ball(1120, 590, 10, 1);
-// let Ball45= new Ball(500, 340, 30, 2);
-// Ball1.vel.x = 290;
-
-
+refreshBallList();
 
 requestAnimationFrame(mainLoop);

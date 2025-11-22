@@ -1,21 +1,222 @@
+<!-- ...existing code... -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        #canvas{
-            border: 1px solid black;
-            display: block;
-            margin: 0 auto;
-            background: #fffacc;
+        :root{
+            --panel-bg: #fbfbfe;
+            --panel-border: #e1e6ef;
+            --accent: #2b7cff;
+            --muted: #6b7280;
+            --glass: rgba(255,255,255,0.6);
+            --radius: 10px;
+            --gap: 12px;
+            --panel-padding: 12px;
+            --btn-bg: linear-gradient(180deg,#3b82f6,#1e66d6);
+            --btn-color: #fff;
         }
+
+        * { box-sizing: border-box; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+
+        body{
+            margin: 16px;
+            background: linear-gradient(180deg,#f6f8fb,#fff);
+            color: #111827;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap: 8px;
+        }
+
+        #canvas{
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            display: block;
+            margin: 0;
+            background: #fffdf5;
+            box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+        }
+
+        #toolbox{
+            width: 640px;
+            max-width: calc(100% - 32px);
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 240px;
+            gap: var(--gap);
+            align-items: start;
+        }
+
+        .panel{
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            padding: var(--panel-padding);
+            border-radius: var(--radius);
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(11,20,40,0.04);
+        }
+
+        .panel strong{
+            display:block;
+            margin-bottom:8px;
+            font-weight:600;
+            color: #0f172a;
+        }
+
+        .panel label{
+            display:block;
+            color: var(--muted);
+            font-size:12px;
+            margin-top:6px;
+        }
+
+        .panel input[type="number"],
+        .panel input[type="text"],
+        .panel select {
+            width: 100%;
+            padding:6px 8px;
+            margin-top:6px;
+            border-radius:6px;
+            border:1px solid #e6eef8;
+            background: linear-gradient(180deg,#fff,#fbfcff);
+            outline:none;
+            transition: box-shadow .12s, border-color .12s;
+            font-size:13px;
+            color:#0f172a;
+        }
+
+        .panel input[type="number"]:focus,
+        .panel input[type="text"]:focus,
+        .panel select:focus {
+            box-shadow: 0 4px 12px rgba(43,124,255,0.12);
+            border-color: var(--accent);
+        }
+
+        .panel .row{
+            display:flex;
+            gap:8px;
+            align-items:center;
+            margin-top:6px;
+        }
+
+        .panel button {
+            display: inline-block;
+            padding:8px 10px;
+            margin-top: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: var(--btn-bg);
+            color: var(--btn-color);
+            box-shadow: 0 6px 14px rgba(43,124,255,0.18);
+            transition: transform .06s ease, box-shadow .06s;
+            font-weight:600;
+            font-size:13px;
+        }
+        .panel button:hover{ transform: translateY(-1px); }
+        .panel button.secondary{
+            background: linear-gradient(180deg,#e6eef8,#d7e6fb);
+            color: #0f172a;
+            box-shadow: none;
+        }
+
+        #ballList{
+            width:100%;
+            height: 156px;
+            padding:6px;
+            border-radius:8px;
+            border:1px solid #e6eef8;
+            background: white;
+            outline:none;
+        }
+
+        /* small helper for properties layout */
+        #ballProps input{ width: 100%; }
+
+        /* responsive: stack on small screens */
+        @media (max-width:720px){
+            #toolbox{
+                grid-template-columns: 1fr;
+            }
+            #ballList{
+                height: 120px;
+            }
+        }
+
+        /* subtle tone for labels inside panels */
+        .hint{ font-size:12px; color:var(--muted); margin-top:6px; display:block; }
     </style>
     <title>Collision Response</title>
 </head>
 <body>
+<!-- ...existing code... -->
     <canvas id="canvas" tabindex=0 width="640" height="480"></canvas>
+
+    <div id="toolbox">
+        <div class="panel" id="addBallPanel">
+            <strong>Add Ball</strong>
+            <label for="add_b_x">x</label>
+            <input id="add_b_x" type="number" value="100">
+            <label for="add_b_y">y</label>
+            <input id="add_b_y" type="number" value="100">
+            <label for="add_b_r">r</label>
+            <input id="add_b_r" type="number" value="30">
+            <label for="add_b_m">m</label>
+            <input id="add_b_m" type="number" value="5">
+            <label for="add_b_e">e</label>
+            <input id="add_b_e" type="number" step="0.1" min="0" max="1" value="0.8">
+            <label for="add_b_col">color</label>
+            <input id="add_b_col" type="text" value="red">
+            <div class="row">
+                <button id="addBallBtn">Add Ball</button>
+                <button id="randomBallBtn" class="secondary" type="button" onclick="(function(){ const x=randInt(60,580), y=randInt(40,440), r=randInt(12,40), m=randInt(1,8); const b=new Ball(x,y,r,m); b.elasticity = Math.random().toFixed(2); refreshBallList(); })()">Random</button>
+            </div>
+        </div>
+
+        <div class="panel" id="addWallPanel">
+            <strong>Add Wall</strong>
+            <label for="add_w_x1">x1</label>
+            <input id="add_w_x1" type="number" value="300">
+            <label for="add_w_y1">y1</label>
+            <input id="add_w_y1" type="number" value="200">
+            <label for="add_w_x2">x2</label>
+            <input id="add_w_x2" type="number" value="500">
+            <label for="add_w_y2">y2</label>
+            <input id="add_w_y2" type="number" value="300">
+            <div class="row">
+                <button id="addWallBtn">Add Wall</button>
+                <button id="clearWallsBtn" class="secondary" type="button" onclick="WALLZ.length=0">Clear</button>
+            </div>
+            <span class="hint">Стіни це відрізки на canvas. </span>
+        </div>
+
+        <div class="panel" id="ballsPanel">
+            <strong>Balls</strong>
+            <select id="ballList" size="6"></select>
+            <div id="ballProps" style="margin-top:8px;">
+                <label for="prop_b_x">x</label>
+                <input id="prop_b_x" type="number">
+                <label for="prop_b_y">y</label>
+                <input id="prop_b_y" type="number">
+                <label for="prop_b_r">r</label>
+                <input id="prop_b_r" type="number">
+                <label for="prop_b_m">m</label>
+                <input id="prop_b_m" type="number">
+                <label for="prop_b_e">e</label>
+                <input id="prop_b_e" type="number" step="0.1" min="0" max="1">
+                <label for="prop_b_col">color</label>
+                <input id="prop_b_col" type="text">
+                <div class="row">
+                    <button id="updateBallBtn">Update</button>
+                    <button id="deleteBallBtn" class="secondary">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
 </html>
+<!-- ...existing code... -->
